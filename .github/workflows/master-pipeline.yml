@@ -11,36 +11,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 🔄 BUILD STAGE: CentralPerk-Web
   centralperkweb:
     name: Build CentralPerk-Web
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: CentralPerk-Web
-      sonar-project-key: Tribe2-Frontend_Web_CentralPerk-Web
-    secrets: inherit
+      sonar-project-key: Tribe2_Web_CentralPerk-Web
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 🔄 BUILD STAGE: Nexus-Web
   nexusweb:
     name: Build Nexus-Web
     needs: centralperkweb
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: Nexus-Web
-      sonar-project-key: Tribe2-Frontend_Web_Nexus-Web
-    secrets: inherit
+      sonar-project-key: Tribe2_Web_Nexus-Web
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 🔄 BUILD STAGE: ShelfAwareness-Web
   shelfawarenessweb:
     name: Build ShelfAwareness-Web
     needs: nexusweb
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: ShelfAwareness-Web
-      sonar-project-key: Tribe2-Frontend_Web_ShelfAwareness-Web
-    secrets: inherit
+      sonar-project-key: Tribe2_Web_ShelfAwareness-Web
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 🚀 DEPLOY STAGE: CentralPerk-Web
   deploy-staging-centralperkweb:
     name: Deploy Staging — CentralPerk-Web
     needs: centralperkweb
@@ -52,7 +51,6 @@ jobs:
       artifact-name: CentralPerk-Web-web-build
     secrets: inherit
 
-  # 🚀 DEPLOY STAGE: Nexus-Web
   deploy-staging-nexusweb:
     name: Deploy Staging — Nexus-Web
     needs: nexusweb
@@ -64,7 +62,6 @@ jobs:
       artifact-name: Nexus-Web-web-build
     secrets: inherit
 
-  # 🚀 DEPLOY STAGE: ShelfAwareness-Web
   deploy-staging-shelfawarenessweb:
     name: Deploy Staging — ShelfAwareness-Web
     needs: shelfawarenessweb
