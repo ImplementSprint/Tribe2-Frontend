@@ -11,44 +11,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 🟢 STAGE 1: pakiPARK-Web
-  pakipark-web:
-    name: pakiPARK-Web Pipeline
+  # 🔄 BUILD STAGE: CentralPerk-Web
+  centralperkweb:
+    name: Build CentralPerk-Web
     uses: ./.github/workflows/front-end-workflow.yml
     with:
-      system-dir: pakiPARK-Web
-      sonar-project-key: Tribe2_Frontend_pakiPARK-Web
+      system-dir: CentralPerk-Web
+      sonar-project-key: Tribe2-Frontend_Web_CentralPerk-Web
     secrets: inherit
 
-  # 🟢 STAGE 2: pakiSHIP-Web
-  pakiship-web:
-    name: pakiSHIP-Web Pipeline
-    needs: pakipark-web
+  # 🔄 BUILD STAGE: Nexus-Web
+  nexusweb:
+    name: Build Nexus-Web
+    needs: centralperkweb
     uses: ./.github/workflows/front-end-workflow.yml
     with:
-      system-dir: pakiSHIP-Web
-      sonar-project-key: Tribe2_Frontend_pakiSHIP-Web
+      system-dir: Nexus-Web
+      sonar-project-key: Tribe2-Frontend_Web_Nexus-Web
     secrets: inherit
 
-  # 🚀 STAGE 3: Deploy Staging (Web)
-  deploy-staging-pakipark-web:
-    name: Staging — pakiPARK-Web
-    needs: [pakipark-web, pakiship-web]
+  # 🔄 BUILD STAGE: ShelfAwareness-Web
+  shelfawarenessweb:
+    name: Build ShelfAwareness-Web
+    needs: nexusweb
+    uses: ./.github/workflows/front-end-workflow.yml
+    with:
+      system-dir: ShelfAwareness-Web
+      sonar-project-key: Tribe2-Frontend_Web_ShelfAwareness-Web
+    secrets: inherit
+
+  # 🚀 DEPLOY STAGE: CentralPerk-Web
+  deploy-staging-centralperkweb:
+    name: Deploy Staging — CentralPerk-Web
+    needs: centralperkweb
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/deploy-staging.yml
     with:
-      system-dir: pakiPARK-Web
+      system-dir: CentralPerk-Web
       app-type: web
-      artifact-name: pakiPARK-Web-web-build
+      artifact-name: CentralPerk-Web-web-build
     secrets: inherit
 
-  deploy-staging-pakiship-web:
-    name: Staging — pakiSHIP-Web
-    needs: deploy-staging-pakipark-web
-    if: ${{ !cancelled() && !failure() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+  # 🚀 DEPLOY STAGE: Nexus-Web
+  deploy-staging-nexusweb:
+    name: Deploy Staging — Nexus-Web
+    needs: nexusweb
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/deploy-staging.yml
     with:
-      system-dir: pakiSHIP-Web
+      system-dir: Nexus-Web
       app-type: web
-      artifact-name: pakiSHIP-Web-web-build
+      artifact-name: Nexus-Web-web-build
     secrets: inherit
+
+  # 🚀 DEPLOY STAGE: ShelfAwareness-Web
+  deploy-staging-shelfawarenessweb:
+    name: Deploy Staging — ShelfAwareness-Web
+    needs: shelfawarenessweb
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/deploy-staging.yml
+    with:
+      system-dir: ShelfAwareness-Web
+      app-type: web
+      artifact-name: ShelfAwareness-Web-web-build
+    secrets: inherit
+
