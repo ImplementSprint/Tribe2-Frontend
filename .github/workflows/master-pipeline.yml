@@ -1,4 +1,4 @@
-name: Master Pipeline Orchestrator (Web)
+name: Master Pipeline Orchestrator
 
 on:
   push:
@@ -7,42 +7,51 @@ on:
     branches: [main, develop]
 
 concurrency:
-  group: web-pipeline-${{ github.ref }}
+  group: master-pipeline-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  centralperkweb:
-    name: Build CentralPerk-Web
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  STAGE 1 — CentralPerk-Web Pipeline                       ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  centralperk-web:
+    name: CentralPerk-Web Pipeline
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: CentralPerk-Web
-      sonar-project-key: Tribe2_Web_CentralPerk-Web
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      sonar-project-key: Tribe2-Frontend_CentralPerk-Web
+    secrets: inherit
 
-  nexusweb:
-    name: Build Nexus-Web
-    needs: centralperkweb
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  STAGE 2 — Nexus-Web Pipeline                             ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  nexus-web:
+    name: Nexus-Web Pipeline
+    needs: centralperk-web
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: Nexus-Web
-      sonar-project-key: Tribe2_Web_Nexus-Web
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      sonar-project-key: Tribe2-Frontend_Nexus-Web
+    secrets: inherit
 
-  shelfawarenessweb:
-    name: Build ShelfAwareness-Web
-    needs: nexusweb
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  STAGE 3 — ShelfAwareness-Web Pipeline                    ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  shelfawareness-web:
+    name: ShelfAwareness-Web Pipeline
+    needs: nexus-web
     uses: ./.github/workflows/front-end-workflow.yml
     with:
       system-dir: ShelfAwareness-Web
-      sonar-project-key: Tribe2_Web_ShelfAwareness-Web
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      sonar-project-key: Tribe2-Frontend_ShelfAwareness-Web
+    secrets: inherit
 
-  deploy-staging-centralperkweb:
-    name: Deploy Staging — CentralPerk-Web
-    needs: centralperkweb
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  STAGE 4 — Deploy to Staging                               ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  deploy-staging-centralperk-web:
+    name: Staging — CentralPerk-Web
+    needs: [centralperk-web, nexus-web, shelfawareness-web]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/deploy-staging.yml
     with:
@@ -51,10 +60,10 @@ jobs:
       artifact-name: CentralPerk-Web-web-build
     secrets: inherit
 
-  deploy-staging-nexusweb:
-    name: Deploy Staging — Nexus-Web
-    needs: nexusweb
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+  deploy-staging-nexus-web:
+    name: Staging — Nexus-Web
+    needs: deploy-staging-centralperk-web
+    if: ${{ !cancelled() && !failure() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
     uses: ./.github/workflows/deploy-staging.yml
     with:
       system-dir: Nexus-Web
@@ -62,14 +71,46 @@ jobs:
       artifact-name: Nexus-Web-web-build
     secrets: inherit
 
-  deploy-staging-shelfawarenessweb:
-    name: Deploy Staging — ShelfAwareness-Web
-    needs: shelfawarenessweb
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+  deploy-staging-shelfawareness-web:
+    name: Staging — ShelfAwareness-Web
+    needs: deploy-staging-nexus-web
+    if: ${{ !cancelled() && !failure() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
     uses: ./.github/workflows/deploy-staging.yml
     with:
       system-dir: ShelfAwareness-Web
       app-type: web
       artifact-name: ShelfAwareness-Web-web-build
     secrets: inherit
+
+  # ╔══════════════════════════════════════════════════════════════╗
+  # ║  STAGE 5 — Pipeline Summary                                ║
+  # ╚══════════════════════════════════════════════════════════════╝
+  pipeline-summary:
+    name: Pipeline Summary
+    needs: [centralperk-web, nexus-web, shelfawareness-web]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pipeline Results
+        run: |
+          echo "╔══════════════════════════════════════════════╗"
+          echo "║        MASTER PIPELINE SUMMARY               ║"
+          echo "╠══════════════════════════════════════════════╣"
+          echo "║ Branch:   ${{ github.ref_name }}"
+          echo "║ Commit:   ${{ github.sha }}"
+          echo "║ Actor:    ${{ github.actor }}"
+          echo "╠══════════════════════════════════════════════╣"
+          echo "║ CentralPerk-Web:    ${{ needs.centralperk-web.result }}"
+          echo "║ Nexus-Web:          ${{ needs.nexus-web.result }}"
+          echo "║ ShelfAwareness-Web: ${{ needs.shelfawareness-web.result }}"
+          echo "╚══════════════════════════════════════════════╝"
+
+          # Fail the summary if any pipeline failed
+          if [[ "${{ needs.centralperk-web.result }}" == "failure" ]] || \
+             [[ "${{ needs.nexus-web.result }}" == "failure" ]] || \
+             [[ "${{ needs.shelfawareness-web.result }}" == "failure" ]]; then
+            echo "❌ One or more pipelines failed!"
+            exit 1
+          fi
+          echo "✅ All pipelines completed successfully!"
 
